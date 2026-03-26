@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.vscode/
+sample_photos/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+.DS_Store
