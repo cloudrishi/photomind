@@ -131,3 +131,86 @@ def match_faces(image_path: str, tolerance: float = 0.6) -> list:
             matched_names.append("unknown")
 
     return matched_names
+
+
+def get_unknown_faces(image_path: str, tolerance: float = 0.6) -> list[dict]:
+    """
+    Detect unknown faces in a photo.
+    Returns list of dicts with cropped face image and encoding.
+    """
+    import face_recognition
+    import numpy as np
+    from .database import get_all_faces
+
+    path = Path(image_path).expanduser()
+
+    # Load and resize image
+    img = Image.open(path)
+    img.thumbnail((1024, 1024))
+    img = img.convert("RGB")
+    img_array = np.array(img)
+
+    # Detect faces
+    face_locations = face_recognition.face_locations(img_array)
+    if not face_locations:
+        return []
+
+    # Get encodings
+    face_encodings = face_recognition.face_encodings(img_array, face_locations)
+
+    # Load known faces from MongoDB
+    known_faces = get_all_faces()
+    known_encodings = [np.array(f["encoding"]) for f in known_faces]
+
+    unknown_faces = []
+    for i, (face_encoding, face_location) in enumerate(
+        zip(face_encodings, face_locations)
+    ):
+        # Check if face is known
+        if known_encodings:
+            matches = face_recognition.compare_faces(
+                known_encodings, face_encoding, tolerance=tolerance
+            )
+            if True in matches:
+                continue  # Skip known faces
+
+        # Crop unknown face
+        top, right, bottom, left = face_location
+        padding = 20
+        top = max(0, top - padding)
+        right = min(img_array.shape[1], right + padding)
+        bottom = min(img_array.shape[0], bottom + padding)
+        left = max(0, left - padding)
+
+        face_crop = img.crop((left, top, right, bottom))
+
+        # Save cropped face to temp file
+        crops_dir = Path(__file__).parent.parent / "temp_crops"
+        crops_dir.mkdir(exist_ok=True)
+        crop_path = str(crops_dir / f"unknown_face_{i}.jpg")
+        face_crop.save(crop_path)
+
+        unknown_faces.append(
+            {
+                "index": i,
+                "encoding": face_encoding.tolist(),
+                "crop_path": crop_path,
+                "location": face_location,
+            }
+        )
+
+    return unknown_faces
+
+
+def enroll_unknown_face(encoding: list, name: str, crop_path: str) -> dict:
+    """
+    Enroll an unknown face that was identified by the user.
+    """
+    from .database import save_face_encoding
+
+    save_face_encoding(name, encoding, crop_path)
+    return {
+        "status": "success",
+        "name": name,
+        "message": f"✅ {name} enrolled successfully!",
+    }
