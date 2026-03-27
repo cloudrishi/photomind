@@ -15,24 +15,32 @@ PhotoMind uses **Claude Vision AI** and **face recognition** to analyze your pho
 - **Batch Processing** — rename entire folders at once
 - **Dry Run Mode** — preview suggested names before applying
 - **Web UI** — drag & drop interface via Gradio
-- **Auto Resize** — handles large photos automatically
+- **Auto Resize** — handles large photos automatically (>5MB)
 
 ### Phase 2 — Face Recognition
 - **Known People Detection** — identifies enrolled people by name using `face_recognition`
-- **MongoDB Storage** — stores face encodings in a local MongoDB instance
+- **MongoDB Storage** — stores face encodings in a local MongoDB instance (Docker)
 - **Hybrid Approach** — face recognition for known people, Claude for unknowns
 - **Real Names in Filenames** — `rishi-and-rakesh-bar-portrait.jpeg` instead of `two-men-bar-photo.jpeg`
 - **Enrollment Script** — enroll people from a reference photo folder
 - **Graceful Fallback** — if face recognition fails, Claude handles people detection
 
+### Phase 3 — Smart Enrollment UI
+- **"Who is this?"** — unknown faces shown as cropped images in the UI
+- **One-click enrollment** — type a name, click enroll, app learns instantly
+- **Output Folder** — renamed photos saved to a user-specified folder
+- **Original safe** — source photo never modified
+- **Self-learning** — gets smarter every time you use it
+
 ---
 
 ## 🖼️ Demo
 
-| Original | Phase 1 | Phase 2 |
+| Original | Phase 1 | Phase 2 & 3 |
 |---|---|---|
 | `IMG_0957.jpeg` | `two-men-bar-casual-portrait.jpeg` | `2015-09-26-rishi-and-rakesh-bar-portrait-arms.jpeg` |
 | `photo1.jpg` | `elderly-man-teaching-children.jpg` | `grandfather-teaching-grandchildren-cooking-kitchen.jpg` |
+| `IMG_4821.jpg` | `wildflower-meadow-sunset.jpg` | `2024-06-15-wildflower-meadow-sunset-mountain-landscape.jpg` |
 
 ---
 
@@ -45,9 +53,10 @@ Photo (JPG/PNG/WebP)
    Auto Resize (if > 5MB)
         │
         ├── face_recognition
-        │   ├── Detect faces
+        │   ├── Detect all faces
         │   ├── Compare against MongoDB encodings
-        │   └── Return known names ["rishi", "rakesh"]
+        │   ├── Known → return name ["rishi", "rakesh"]
+        │   └── Unknown → crop face → show in UI → user names → save to MongoDB
         │
         ▼
   Claude Vision API (Haiku)
@@ -63,8 +72,7 @@ Photo (JPG/PNG/WebP)
   New Filename
   2015-09-26-rishi-and-rakesh-bar-portrait.jpeg
         │
-        ├── Gradio Web UI
-        └── CLI
+        └── Save to Output Folder
 ```
 
 ---
@@ -98,6 +106,7 @@ pip install -r requirements.txt
 
 # Set your API key
 export ANTHROPIC_API_KEY="sk-ant-..."
+# Add to ~/.zshrc for permanent use
 ```
 
 ### Start MongoDB
@@ -106,23 +115,19 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 docker compose up -d
 ```
 
-### Enroll Known People (Phase 2)
+### Enroll Known People
 
 ```bash
-# Create reference folder
+# Add reference photos named after each person
 mkdir reference_faces
-
-# Add photos named after each person
 # reference_faces/rishi.jpeg
 # reference_faces/anya.jpeg
-# reference_faces/rakesh.jpeg
 
-# Enroll all people
+# Enroll from folder
 python -c "
 from src.enroll import enroll_from_folder
 results = enroll_from_folder('reference_faces')
-for r in results:
-    print(r)
+for r in results: print(r)
 "
 ```
 
@@ -135,19 +140,30 @@ python main.py
 
 ---
 
+## 🖥️ Web UI Tabs
+
+| Tab | Description |
+|---|---|
+| 🖼️ **Single Photo** | Upload photo, analyze, see unknown faces, enroll, save to output folder |
+| 📁 **Batch Folder** | Process entire folders with progress log |
+| 👥 **Manage People** | Enroll from reference folder, view enrolled people |
+
+---
+
 ## 📁 Project Structure
 
 ```
 photomind/
 ├── src/
 │   ├── analyzer.py      # Core AI logic — Claude Vision + face recognition
-│   ├── app.py           # Gradio web UI
+│   ├── app.py           # Gradio web UI (3 tabs)
 │   ├── cli.py           # CLI interface
 │   ├── database.py      # MongoDB operations
-│   ├── enroll.py        # Face enrollment script
+│   ├── enroll.py        # Face enrollment + unknown face detection
 │   └── __init__.py
 ├── reference_faces/     # Reference photos for enrollment (gitignored)
 ├── sample_photos/       # Test photos (gitignored)
+├── temp_crops/          # Temporary face crops for UI (gitignored)
 ├── docker-compose.yml   # MongoDB container
 ├── main.py              # Entry point
 └── requirements.txt
@@ -182,7 +198,7 @@ Using Claude Haiku — the most cost-efficient model:
 
 - [x] **Phase 1** — Smart naming, people detection, batch processing, Gradio UI
 - [x] **Phase 2** — Known people recognition using face_recognition + MongoDB
-- [ ] **Phase 3** — "Who is this?" unknown face prompt in Gradio UI
+- [x] **Phase 3** — "Who is this?" unknown face prompt, output folder, self-learning
 - [ ] **Phase 4** — Auto-organize into folders by date/event/people
 
 ---
