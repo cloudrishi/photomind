@@ -10,3 +10,4 @@ sample_photos/
 *.gif
 *.webp
 .DS_Store
+.sfdx/
